@@ -11,12 +11,11 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.AuthenticationException;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
+import javax.servlet.http.HttpServletRequest;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 import static org.springframework.http.ResponseEntity.ok;
@@ -43,13 +42,29 @@ public class AuthController {
             String username = data.getEmail();
             authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(username, data.getPassword()));
             String token = jwtTokenProvider.createToken(username, this.users.findByEmail(username).getRoles());
-            Map<Object, Object> model = new HashMap<>();
+            String refreshToken = jwtTokenProvider.createRefreshToken(username, this.users.findByEmail(username).getRoles());
+            Map<Object, Object> model = new LinkedHashMap<>();
             model.put("username", username);
             model.put("token", token);
+            model.put("refresh-token", refreshToken);
             return ok(model);
         } catch (AuthenticationException e) {
             throw new BadCredentialsException("Invalid email/password supplied");
         }
+    }
+
+    @GetMapping("/refresh-token")
+    public ResponseEntity refreshToken(HttpServletRequest req){
+        String refreshToken = jwtTokenProvider.resolveRefreshToken( req);
+        String username = jwtTokenProvider.getUsername(refreshToken);
+        jwtTokenProvider.removeToken(refreshToken);
+        String token = jwtTokenProvider.createToken(username, this.users.findByEmail(username).getRoles());
+        refreshToken = jwtTokenProvider.createRefreshToken(username, this.users.findByEmail(username).getRoles());
+        Map<Object, Object> model = new LinkedHashMap<>();
+        model.put("username", username);
+        model.put("token", token);
+        model.put("refresh-token", refreshToken);
+        return ok(model);
     }
 
     @SuppressWarnings("rawtypes")
